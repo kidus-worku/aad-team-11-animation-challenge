@@ -1,6 +1,7 @@
 package com.team11.animation_challenge;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -10,7 +11,11 @@ import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.drawable.Animatable;
+import android.graphics.drawable.AnimatedVectorDrawable;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.Html;
 import android.text.Spanned;
@@ -22,6 +27,7 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.view.animation.TranslateAnimation;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextSwitcher;
 import android.widget.TextView;
@@ -46,7 +52,7 @@ import okhttp3.ResponseBody;
 public class TriviaActivity extends AppCompatActivity implements View.OnClickListener {
     public static final String CATEGORY_URL = "com.team11.animation_challenge.CATEGORY_URL";
     public static final String CATEGORY_TITLE = "com.team11.animation_challenge.CATEGORY_TITLE";
-    public static final int TIME_LIMIT = 1000 * 11; //11 sec
+    public static final int TIME_LIMIT = 1000 * 25; //11 sec
     public final OkHttpClient client = new OkHttpClient();
 
     private String url;
@@ -71,7 +77,9 @@ public class TriviaActivity extends AppCompatActivity implements View.OnClickLis
     private AlertDialog completedDialog;
     private TranslateAnimation animObj;
     private ObjectAnimator progressBarOA;
-
+    private ImageView modalTrophyImage;
+    private Animation mShakeAnimation;
+    private Animation mBounceAnimation;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -97,6 +105,8 @@ public class TriviaActivity extends AppCompatActivity implements View.OnClickLis
         questionCount = (TextView) findViewById(R.id.question_count);
         timerProgressBar = (ProgressBar) findViewById(R.id.timer_progress_bar);
         timerProgressBar.setMax(TIME_LIMIT);
+        mShakeAnimation = AnimationUtils.loadAnimation(this, R.anim.skake_animation);
+        mBounceAnimation = AnimationUtils.loadAnimation(this, R.anim.bounce_animation);
 
         button1 = (Button) findViewById(R.id.button_trivia_1);
         button2 = (Button) findViewById(R.id.button_trivia_2);
@@ -167,6 +177,7 @@ public class TriviaActivity extends AppCompatActivity implements View.OnClickLis
         dialogButton = (Button) layoutView.findViewById(R.id.button_dialog);
         TextView resultText = (TextView) layoutView.findViewById(R.id.result_text);
         TextView praiseText = (TextView) layoutView.findViewById(R.id.praise_text);
+        modalTrophyImage = (ImageView) findViewById(R.id.award);
 
         dialogBuilder.setView(layoutView);
         completedDialog = dialogBuilder.create();
@@ -182,6 +193,8 @@ public class TriviaActivity extends AppCompatActivity implements View.OnClickLis
             praiseText.setText(R.string.perfect_score);
         }
 
+        completedDialog.getWindow().getAttributes().windowAnimations = R.style.CompletedDialogAnimation;
+
         completedDialog.show();
         dialogButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -193,6 +206,14 @@ public class TriviaActivity extends AppCompatActivity implements View.OnClickLis
                 finish();
             }
         });
+    }
+
+    private void trophyAnimation() {
+        PropertyValuesHolder rotateX = PropertyValuesHolder.ofFloat("rotationX", 0f, 360f);
+        PropertyValuesHolder scaleX = PropertyValuesHolder.ofFloat("scaleX", -10000f, 0f);
+        PropertyValuesHolder scaleY = PropertyValuesHolder.ofFloat("scaleY", -10000f, 0f);
+        ObjectAnimator imageOA = ObjectAnimator.ofPropertyValuesHolder(modalTrophyImage, rotateX).setDuration(10000);
+        imageOA.start();
     }
 
     private void getUrlFromIntent() {
@@ -311,17 +332,18 @@ public class TriviaActivity extends AppCompatActivity implements View.OnClickLis
         if (btn.getText().toString().equals(correctAnswer.toString())) {
             //Right Answer Animation Here.
             ++correct;
-            btn.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_check_black_24dp, 0);
+            btn.startAnimation(mBounceAnimation);
+            btn.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_ans_right, 0);
 
         } else {
             //Wrong Answer Animation Here
-            btn.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_wrong_black_24dp, 0);
+            btn.startAnimation(mShakeAnimation);
+            btn.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_ans_wrong, 0);
 
         }
         new android.os.Handler().postDelayed(
                 new Runnable() {
                     public void run() {
-                        // This'll run 700 milliseconds later
                         moveNext();
                     }
                 },
