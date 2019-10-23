@@ -1,6 +1,7 @@
 package com.team11.animation_challenge;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -8,9 +9,14 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.animation.Animator;
 import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
+import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.drawable.Animatable;
+import android.graphics.drawable.AnimatedVectorDrawable;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.Html;
 import android.text.Spanned;
@@ -18,10 +24,12 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.WindowManager;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.view.animation.TranslateAnimation;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextSwitcher;
 import android.widget.TextView;
@@ -46,7 +54,7 @@ import okhttp3.ResponseBody;
 public class TriviaActivity extends AppCompatActivity implements View.OnClickListener {
     public static final String CATEGORY_URL = "com.team11.animation_challenge.CATEGORY_URL";
     public static final String CATEGORY_TITLE = "com.team11.animation_challenge.CATEGORY_TITLE";
-    public static final int TIME_LIMIT = 1000 * 11; //11 sec
+    public static final int TIME_LIMIT = 1000 * 25; //11 sec
     public final OkHttpClient client = new OkHttpClient();
 
     private String url;
@@ -72,6 +80,8 @@ public class TriviaActivity extends AppCompatActivity implements View.OnClickLis
     private TranslateAnimation animObj;
     private ObjectAnimator progressBarOA;
 
+    private Animation mShakeAnimation;
+    private Animation mBounceAnimation;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -97,6 +107,8 @@ public class TriviaActivity extends AppCompatActivity implements View.OnClickLis
         questionCount = (TextView) findViewById(R.id.question_count);
         timerProgressBar = (ProgressBar) findViewById(R.id.timer_progress_bar);
         timerProgressBar.setMax(TIME_LIMIT);
+        mShakeAnimation = AnimationUtils.loadAnimation(this, R.anim.skake_animation);
+        mBounceAnimation = AnimationUtils.loadAnimation(this, R.anim.bounce_animation);
 
         button1 = (Button) findViewById(R.id.button_trivia_1);
         button2 = (Button) findViewById(R.id.button_trivia_2);
@@ -161,39 +173,52 @@ public class TriviaActivity extends AppCompatActivity implements View.OnClickLis
 
 
     private void showCompletedDialog() {
-
         dialogBuilder = new AlertDialog.Builder(TriviaActivity.this);
         View layoutView = getLayoutInflater().inflate(R.layout.dialog_completed, null);
         dialogButton = (Button) layoutView.findViewById(R.id.button_dialog);
         TextView resultText = (TextView) layoutView.findViewById(R.id.result_text);
         TextView praiseText = (TextView) layoutView.findViewById(R.id.praise_text);
+        ImageView modalImage = (ImageView) layoutView.findViewById(R.id.award);
 
         dialogBuilder.setView(layoutView);
         completedDialog = dialogBuilder.create();
         completedDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         resultText.setText(getString(R.string.result_Info, correct, 11));
         if (correct < 5) {
+            modalImage.setImageResource(R.drawable.ic_result_under_5);
             praiseText.setText(R.string.less_than_5);
         } else if (correct >= 5 && correct <= 7) {
+            modalImage.setImageResource(R.drawable.ic_result_under_7);
             praiseText.setText(R.string.five_to_7);
         } else if (correct > 8 && correct <= 10) {
             praiseText.setText(R.string.eight_to_10);
+            modalImage.setImageResource(R.drawable.ic_result_under_10);
         } else {
+            modalImage.setImageResource(R.drawable.ic_result_perfect);
             praiseText.setText(R.string.perfect_score);
         }
 
-        completedDialog.show();
+        completedDialog.getWindow().getAttributes().windowAnimations = R.style.CompletedDialogAnimation;
+
+        try {
+            completedDialog.show();
+        } catch (WindowManager.BadTokenException e) {
+            Log.e("WindowManagerBad ", e.toString());
+        }
+
+
         dialogButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 completedDialog.dismiss();
-                Intent i = new Intent(getBaseContext(), CategoryActivity.class);
+                Intent i = new Intent(TriviaActivity.this, CategoryActivity.class);
                 i.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
                 startActivity(i);
                 finish();
             }
         });
     }
+
 
     private void getUrlFromIntent() {
         Intent intent = getIntent();
@@ -237,6 +262,7 @@ public class TriviaActivity extends AppCompatActivity implements View.OnClickLis
 
         if (position == triviaRequest.getSize() - 1) {
             showCompletedDialog();
+            progressBarOA.cancel();
         } else {
             ++position;
             result = triviaRequest.getResults().get(position);
@@ -271,6 +297,7 @@ public class TriviaActivity extends AppCompatActivity implements View.OnClickLis
         questions = new ArrayList<>();
         question = Html.fromHtml(result.getQuestion());
         correctAnswer = Html.fromHtml(result.getCorrect_answer());
+        Log.d("correctAnswer", String.valueOf(correctAnswer));
         Spanned incorrectAnswer1 = Html.fromHtml(result.getIncorrect_answers().get(0));
         Spanned incorrectAnswer2 = Html.fromHtml(result.getIncorrect_answers().get(1));
         Spanned incorrectAnswer3 = Html.fromHtml(result.getIncorrect_answers().get(2));
@@ -311,17 +338,18 @@ public class TriviaActivity extends AppCompatActivity implements View.OnClickLis
         if (btn.getText().toString().equals(correctAnswer.toString())) {
             //Right Answer Animation Here.
             ++correct;
-            btn.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_check_black_24dp, 0);
+            btn.startAnimation(mBounceAnimation);
+            btn.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_ans_right, 0);
 
         } else {
             //Wrong Answer Animation Here
-            btn.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_wrong_black_24dp, 0);
+            btn.startAnimation(mShakeAnimation);
+            btn.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_ans_wrong, 0);
 
         }
         new android.os.Handler().postDelayed(
                 new Runnable() {
                     public void run() {
-                        // This'll run 700 milliseconds later
                         moveNext();
                     }
                 },
@@ -348,6 +376,9 @@ public class TriviaActivity extends AppCompatActivity implements View.OnClickLis
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_refresh) {
             try {
+                correct = 0;
+                position = 0;
+                questions = new ArrayList<>();
                 fetch();
             } catch (Exception e) {
                 e.printStackTrace();
